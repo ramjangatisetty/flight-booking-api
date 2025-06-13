@@ -1,0 +1,30 @@
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# dotenv environment files
+.env
+.env.*
+
+# Build directories
+dist/
+coverage/
+
+# Database dumps
+dump/
+*.gz
+
+# OS files
+.DS_Store
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+
+# Docker
+*.pid
