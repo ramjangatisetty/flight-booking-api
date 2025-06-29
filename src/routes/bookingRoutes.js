@@ -1,43 +1,32 @@
 const express = require('express');
 const { authenticate, authorize } = require('../middleware/auth');
 const bookingController = require('../controllers/bookingController');
-const twofaController = require('../controllers/twofaController');
-const bookingFileController = require('../controllers/bookingFileController');
-const multer = require('multer');
-const path = require('path');
-
-const upload = multer({
-  dest: path.join(__dirname, '../../uploads/')
-});
 
 const router = express.Router();
 
+// Create booking (deeply nested JSON allowed!)
 router.post('/', authenticate, bookingController.createBooking);
-router.get('/', authenticate, authorize(['admin']), bookingController.listAllBookings);
-router.get('/me', authenticate, bookingController.myBookings);
 
+// List all bookings
+router.get('/', authenticate, bookingController.listBookings);
+
+// Get booking by ID
+router.get('/:id', authenticate, bookingController.getBooking);
+
+// Update a booking
+router.put('/:id', authenticate, bookingController.updateBooking);
+
+// Soft delete (cancel) booking
 router.delete('/:id', authenticate, bookingController.softDeleteBooking);
+
+// Restore booking
 router.post('/:id/restore', authenticate, bookingController.restoreBooking);
-router.patch('/:id/cancel', authenticate, bookingController.cancelBooking);
 
-router.get('/:id/status', authenticate, bookingController.getBookingStatus);
+// Upload booking file (multipart/form-data, file field 'file')
+router.post('/:id/upload', authenticate, bookingController.uploadBookingFile);
 
-// File upload/download
-router.post('/:id/upload', authenticate, upload.single('file'), async (req, res) => {
-  const BookingFile = require('../models/BookingFile');
-  const bookingFile = await BookingFile.create({
-    booking: req.params.id,
-    filename: req.file.filename,
-    originalname: req.file.originalname,
-    mimetype: req.file.mimetype,
-    path: req.file.path
-  });
-  res.status(201).json(bookingFile);
-});
-router.get('/:id/files', authenticate, bookingFileController.listFiles);
-router.get('/:id/files/:fileId', authenticate, bookingFileController.downloadFile);
-
-// 2FA confirmation
-router.post('/:id/confirm-2fa', authenticate, twofaController.confirmBookingWith2FA);
+// List/download files (dummy endpoints)
+router.get('/:id/files', authenticate, bookingController.listBookingFiles);
+router.get('/:id/files/:fileId', authenticate, bookingController.downloadBookingFile);
 
 module.exports = router;

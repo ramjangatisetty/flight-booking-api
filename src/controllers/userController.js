@@ -7,9 +7,15 @@ const register = async (req, res) => {
     await user.save();
     res.status(201).json({ message: 'User registered', user });
   } catch (err) {
-    res.status(409).json({ error: 'Email already exists' });
+    if (err.code === 11000 && err.keyPattern && err.keyPattern.email) {
+      // Duplicate email (unique index)
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    // Other errors (validation, etc.)
+    res.status(400).json({ error: err.message });
   }
 };
+
 
 const login = async (req, res) => {
   const { email, password } = req.body;

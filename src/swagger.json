@@ -2,533 +2,587 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Flight Booking API",
-    "version": "1.1.0",
-    "description": "A production-grade REST API for flight booking and enterprise API automation practice."
+    "version": "1.0.0",
+    "description": "Feature-rich API for airline booking systems. JWT auth. Role-based access. Nested models.\n\n**Roles:**\n- `admin`: All privileges\n- `traveler`: Can book/view own bookings\n- `flight_manager`: Manage flights\n- `support`: View data, impersonate users\n\n_See each endpoint's description for access level._"
   },
   "servers": [
-    { "url": "http://localhost:3000/api/v1" }
+    { "url": "http://localhost:3000", "description": "Local server" }
+  ],
+  "tags": [
+    { "name": "Users", "description": "User registration, login, info" },
+    { "name": "Flights", "description": "Flight management/search" },
+    { "name": "Bookings", "description": "Create/view/cancel bookings" },
+    { "name": "Payments", "description": "Payment for bookings" },
+    { "name": "Audit", "description": "Audit log" },
+    { "name": "Webhooks", "description": "Manage webhooks" }
   ],
   "components": {
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
-        "scheme": "bearer"
-      },
-      "ApiKeyAuth": {
-        "type": "apiKey",
-        "name": "x-api-key",
-        "in": "header"
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     },
     "schemas": {
       "User": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "email": { "type": "string" },
-          "password": { "type": "string" },
-          "phone": { "type": "string" },
-          "role": { "type": "string" }
+          "id":   { "type": "string", "example": "661234abcdef987654321000" },
+          "name": { "type": "string", "example": "Admin User" },
+          "email": { "type": "string", "example": "admin@flight.com" },
+          "role": {
+            "type": "string",
+            "enum": ["admin", "traveler", "flight_manager", "support"],
+            "description": "User's role for access control",
+            "example": "admin"
+          },
+          "phone": { "type": "string", "example": "5551001" }
         }
       },
       "Flight": {
         "type": "object",
         "properties": {
-          "flightNumber": { "type": "string" },
-          "source": { "type": "string" },
-          "destination": { "type": "string" },
-          "departure": { "type": "string", "format": "date-time" },
-          "arrival": { "type": "string", "format": "date-time" },
-          "duration": { "type": "string" },
-          "class": { "type": "array", "items": { "type": "string" } },
-          "price": { "type": "number" },
-          "currency": { "type": "string" },
-          "seatsAvailable": { "type": "integer" },
-          "isActive": { "type": "boolean" }
-        }
-      },
-      "Passenger": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string" },
-          "age": { "type": "integer" },
-          "passport": { "type": "string" },
-          "seat": { "type": "string" }
+          "id": { "type": "string", "example": "661234abcdef987654321abc" },
+          "flightNumber": { "type": "string", "example": "AA100" },
+          "source": { "type": "string", "example": "JFK" },
+          "destination": { "type": "string", "example": "LAX" },
+          "departure": { "type": "string", "format": "date-time", "example": "2025-07-01T08:30:00Z" },
+          "arrival": { "type": "string", "format": "date-time", "example": "2025-07-01T14:30:00Z" },
+          "duration": { "type": "string", "example": "6h" },
+          "class": { "type": "array", "items": { "type": "string" }, "example": ["economy", "business"] },
+          "price": { "type": "number", "example": 450 },
+          "seatsAvailable": { "type": "integer", "example": 60 }
         }
       },
       "Booking": {
         "type": "object",
         "properties": {
-          "user": { "type": "string" },
-          "flight": { "type": "string" },
-          "passengers": { "type": "array", "items": { "$ref": "#/components/schemas/Passenger" } },
-          "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled", "failed"] },
-          "paymentStatus": { "type": "string", "enum": ["pending", "successful", "failed"] }
+          "id": { "type": "string", "example": "bkg_123456" },
+          "status": { "type": "string", "example": "confirmed" },
+          "user": { "$ref": "#/components/schemas/BookingUser" },
+          "flight": { "$ref": "#/components/schemas/BookingFlight" },
+          "passengers": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BookingPassenger" }
+          },
+          "payment": { "$ref": "#/components/schemas/BookingPayment" },
+          "history": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BookingHistory" }
+          }
+        },
+        "example": {
+          "id": "bkg_123456",
+          "status": "confirmed",
+          "user": {
+            "id": "usr_1001",
+            "name": "Alice Smith",
+            "email": "alice@example.com",
+            "profile": {
+              "phone": "+1-555-1234",
+              "loyalty": {
+                "number": "AAL1234567",
+                "status": "Platinum"
+              },
+              "preferences": {
+                "seat": "aisle",
+                "meals": ["vegetarian", "kosher"]
+              }
+            }
+          },
+          "flight": {
+            "id": "flt_555",
+            "flightNumber": "AA101",
+            "segments": [
+              {
+                "origin": "JFK",
+                "destination": "ORD",
+                "departure": "2025-07-01T08:30:00Z",
+                "arrival": "2025-07-01T10:30:00Z",
+                "aircraft": {
+                  "type": "Boeing 737",
+                  "seats": { "economy": 140, "business": 16 }
+                }
+              }
+            ]
+          },
+          "passengers": [
+            {
+              "name": "Alice Smith",
+              "passport": "X12345678",
+              "bags": [
+                { "type": "checked", "weightKg": 23 },
+                { "type": "carry-on", "weightKg": 7 }
+              ],
+              "specialRequests": [
+                { "type": "wheelchair", "details": "needs assistance at boarding" }
+              ]
+            }
+          ],
+          "payment": {
+            "amount": 1150.00,
+            "currency": "USD",
+            "method": "credit_card",
+            "transactions": [
+              {
+                "id": "txn_001",
+                "status": "success",
+                "timestamp": "2025-06-14T13:00:00Z",
+                "processor": { "name": "Stripe", "authCode": "ST123X" }
+              }
+            ]
+          },
+          "history": [
+            { "status": "created", "timestamp": "2025-06-14T12:00:00Z", "by": "system" },
+            { "status": "confirmed", "timestamp": "2025-06-14T12:05:00Z", "by": "user" }
+          ]
+        }
+      },
+      "BookingUser": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "phone": { "type": "string" },
+              "loyalty": {
+                "type": "object",
+                "properties": {
+                  "number": { "type": "string" },
+                  "status": { "type": "string" }
+                }
+              },
+              "preferences": {
+                "type": "object",
+                "properties": {
+                  "seat": { "type": "string" },
+                  "meals": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BookingFlight": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "flightNumber": { "type": "string" },
+          "segments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "origin": { "type": "string" },
+                "destination": { "type": "string" },
+                "departure": { "type": "string", "format": "date-time" },
+                "arrival": { "type": "string", "format": "date-time" },
+                "aircraft": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "type": "string" },
+                    "seats": {
+                      "type": "object",
+                      "properties": {
+                        "economy": { "type": "integer" },
+                        "business": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BookingPassenger": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "passport": { "type": "string" },
+          "bags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "weightKg": { "type": "number" }
+              }
+            }
+          },
+          "specialRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string" },
+                "details": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "BookingPayment": {
+        "type": "object",
+        "properties": {
+          "amount": { "type": "number" },
+          "currency": { "type": "string" },
+          "method": { "type": "string" },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string" },
+                "timestamp": { "type": "string", "format": "date-time" },
+                "processor": {
+                  "type": "object",
+                  "properties": {
+                    "name": { "type": "string" },
+                    "authCode": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BookingHistory": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "by": { "type": "string" }
         }
       },
       "Payment": {
         "type": "object",
         "properties": {
-          "booking": { "type": "string" },
+          "id": { "type": "string" },
+          "bookingId": { "type": "string" },
           "amount": { "type": "number" },
           "currency": { "type": "string" },
-          "status": { "type": "string", "enum": ["pending", "successful", "failed"] },
-          "method": { "type": "string" }
+          "method": { "type": "string" },
+          "status": { "type": "string" }
+        }
+      },
+      "AuditLog": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/User" },
+          "action": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string" },
+          "event": { "type": "string" }
         }
       }
     }
   },
-  "security": [
-    { "bearerAuth": [] },
-    { "ApiKeyAuth": [] }
-  ],
+  "security": [{ "bearerAuth": [] }],
   "paths": {
-    "/users/register": {
+    "/api/v1/users/register": {
       "post": {
-        "summary": "Register new user",
+        "tags": ["Users"],
+        "summary": "Register a new user",
+        "description": "Register a user. Open endpoint.",
         "requestBody": {
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/User" } }
-          }
-        },
-        "responses": {
-          "201": { "description": "User registered" },
-          "409": { "description": "User already exists" }
-        }
-      }
-    },
-    "/users/login": {
-      "post": {
-        "summary": "User login",
-        "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": { "type": "string" },
-                  "password": { "type": "string" }
-                }
+                  "name": { "type": "string", "example": "Test Traveler" },
+                  "email": { "type": "string", "example": "traveler@flight.com" },
+                  "password": { "type": "string", "example": "pass123" },
+                  "role": {
+                    "type": "string",
+                    "enum": ["admin", "traveler", "flight_manager", "support"],
+                    "example": "traveler"
+                  },
+                  "phone": { "type": "string", "example": "5551234" }
+                },
+                "required": ["name", "email", "password"]
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Login success, JWT returned" },
-          "401": { "description": "Unauthorized" }
+          "201": {
+            "description": "User registered",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "409": { "description": "Email already exists" }
         }
       }
     },
-    "/users/me": {
-      "get": {
-        "summary": "Get my profile",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "User info" } }
-      }
-    },
-    "/users": {
-      "get": {
-        "summary": "List all users (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "List of users" } }
-      }
-    },
-    "/users/me/request-2fa": {
+    "/api/v1/users/login": {
       "post": {
-        "summary": "Request 2FA code (email/SMS)",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "2FA code sent" } }
-      }
-    },
-    "/users/impersonate": {
-      "post": {
-        "summary": "Impersonate another user (admin/support)",
-        "security": [{ "bearerAuth": [] }],
+        "tags": ["Users"],
+        "summary": "Login and get JWT",
+        "description": "Login with email and password. Open endpoint.",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
-              "schema": { "type": "object", "properties": { "userId": { "type": "string" } } }
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "example": "admin@flight.com" },
+                  "password": { "type": "string", "example": "admin123" }
+                },
+                "required": ["email", "password"]
+              }
             }
           }
         },
         "responses": {
-          "200": { "description": "Impersonation JWT" },
+          "200": {
+            "description": "JWT token and user object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": { "type": "string", "description": "JWT Token" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/v1/flights": {
+      "get": {
+        "tags": ["Flights"],
+        "summary": "List/search flights",
+        "description": "Get available flights. Auth required. Any role.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of flights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Flight" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Flights"],
+        "summary": "Create flight",
+        "description": "Create a new flight. Requires admin or flight_manager.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Flight" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Flight created" },
           "403": { "description": "Forbidden" }
         }
       }
     },
-    "/flights": {
+    "/api/v1/flights/{id}": {
       "get": {
-        "summary": "List flights (with filtering/pagination)",
-        "parameters": [
-          { "name": "source", "in": "query", "schema": { "type": "string" } },
-          { "name": "destination", "in": "query", "schema": { "type": "string" } },
-          { "name": "page", "in": "query", "schema": { "type": "integer" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
-        ],
-        "responses": { "200": { "description": "List of flights" } }
-      },
-      "post": {
-        "summary": "Create flight (admin/flight_manager)",
+        "tags": ["Flights"],
+        "summary": "Get flight by ID",
+        "description": "Auth required. Any role.",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/Flight" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
           }
-        },
-        "responses": { "201": { "description": "Flight created" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flight details",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flight" } } }
+          },
+          "404": { "description": "Not found" }
+        }
       }
     },
-    "/flights/bulk": {
-      "post": {
-        "summary": "Bulk create flights (admin/flight_manager)",
+    "/api/v1/bookings": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "List bookings",
+        "description": "List bookings for the authenticated user. Any role.",
         "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Flight" } }
+        "responses": {
+          "200": {
+            "description": "List of bookings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Booking" }
+                }
+              }
             }
           }
-        },
-        "responses": { "201": { "description": "Flights created" }, "207": { "description": "Partial success" } }
-      }
-    },
-    "/flights/{id}": {
-      "get": {
-        "summary": "Get flight by ID",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Flight info" }, "404": { "description": "Not found" } }
+        }
       },
-      "put": {
-        "summary": "Update flight",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": {
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/Flight" } }
-          }
-        },
-        "responses": { "200": { "description": "Flight updated" }, "404": { "description": "Not found" } }
-      },
-      "delete": {
-        "summary": "Soft delete flight",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Flight soft deleted" }, "404": { "description": "Not found" } }
-      }
-    },
-    "/flights/{id}/restore": {
       "post": {
-        "summary": "Restore flight",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Flight restored" }, "404": { "description": "Not found" } }
-      }
-    },
-    "/bookings": {
-      "post": {
-        "summary": "Create booking",
+        "tags": ["Bookings"],
+        "summary": "Create booking (nested payload)",
+        "description": "Create a booking with deeply nested data. Traveler only.",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/Booking" } }
-          }
-        },
-        "responses": { "201": { "description": "Booking created" } }
-      },
-      "get": {
-        "summary": "List all bookings (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "List of bookings" } }
-      }
-    },
-    "/bookings/me": {
-      "get": {
-        "summary": "Get my bookings",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "List of bookings" } }
-      }
-    },
-    "/bookings/{id}": {
-      "delete": {
-        "summary": "Soft delete booking",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Booking soft deleted" } }
-      }
-    },
-    "/bookings/{id}/restore": {
-      "post": {
-        "summary": "Restore booking",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Booking restored" } }
-      }
-    },
-    "/bookings/{id}/cancel": {
-      "patch": {
-        "summary": "Cancel booking",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Booking cancelled" } }
-      }
-    },
-    "/bookings/{id}/status": {
-      "get": {
-        "summary": "Get booking/payment status (for async polling)",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Status info" } }
-      }
-    },
-    "/bookings/{id}/confirm-2fa": {
-      "post": {
-        "summary": "Confirm booking with 2FA",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
-              "schema": { "type": "object", "properties": { "code": { "type": "string" } } }
+              "schema": { "$ref": "#/components/schemas/Booking" }
             }
           }
         },
         "responses": {
-          "200": { "description": "Booking confirmed" },
-          "401": { "description": "Invalid/expired 2FA code" }
+          "201": {
+            "description": "Booking created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Booking" }
+              }
+            }
+          }
         }
       }
     },
-    "/bookings/{id}/upload": {
-      "post": {
-        "summary": "Upload a file for booking",
+    "/api/v1/bookings/{id}": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Get booking by ID",
+        "description": "Get a deeply nested booking by ID. Any role (own booking).",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": { "file": { "type": "string", "format": "binary" } }
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Booking" }
               }
+            }
+          },
+          "404": { "description": "Not found" }
+        }
+      }
+    },
+    "/api/v1/payments": {
+      "post": {
+        "tags": ["Payments"],
+        "summary": "Make a payment for a booking",
+        "description": "Authenticated users only.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/Payment" }
             }
           }
         },
-        "responses": { "201": { "description": "File uploaded" } }
+        "responses": {
+          "201": { "description": "Payment success" },
+          "400": { "description": "Invalid payment details" }
+        }
       }
     },
-    "/bookings/{id}/files": {
+    "/api/v1/audit": {
       "get": {
-        "summary": "List files for a booking",
+        "tags": ["Audit"],
+        "summary": "Get audit log",
+        "description": "Admin only.",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "List of files" } }
-      }
-    },
-    "/bookings/{id}/files/{fileId}": {
-      "get": {
-        "summary": "Download file for a booking",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "fileId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "File download" } }
-      }
-    },
-    "/payments/async": {
-      "post": {
-        "summary": "Simulate async payment (pending then success/fail)",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "bookingId": { "type": "string" },
-                  "amount": { "type": "number" },
-                  "status": { "type": "string", "enum": ["successful", "failed"] }
+        "responses": {
+          "200": {
+            "description": "Audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AuditLog" }
                 }
               }
             }
-          }
-        },
-        "responses": { "202": { "description": "Payment processing started" } }
+          },
+          "403": { "description": "Forbidden" }
+        }
       }
     },
-    "/apikeys": {
+    "/api/v1/webhooks": {
       "post": {
-        "summary": "Create new API key",
+        "tags": ["Webhooks"],
+        "summary": "Register webhook",
+        "description": "Admin only.",
         "security": [{ "bearerAuth": [] }],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": { "scopes": { "type": "array", "items": { "type": "string" } } }
-              }
+              "schema": { "$ref": "#/components/schemas/Webhook" }
             }
           }
         },
-        "responses": { "201": { "description": "API key created" } }
+        "responses": {
+          "201": { "description": "Webhook registered" }
+        }
       },
       "get": {
-        "summary": "List my API keys",
+        "tags": ["Webhooks"],
+        "summary": "List webhooks",
+        "description": "Admin only.",
         "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "List of keys" } }
-      }
-    },
-    "/apikeys/{id}": {
-      "delete": {
-        "summary": "Revoke API key",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
-        "responses": { "200": { "description": "API key revoked" } }
-      }
-    },
-    "/export/bookings": {
-      "post": {
-        "summary": "Export bookings as CSV (async job)",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "202": { "description": "Export job started" } }
-      }
-    },
-    "/export/jobs/{id}": {
-      "get": {
-        "summary": "Get export job status/download",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
-        "responses": { "200": { "description": "Export job status" } }
-      }
-    },
-    "/audit": {
-      "get": {
-        "summary": "List audit logs (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "user", "in": "query", "schema": { "type": "string" } },
-          { "name": "resource", "in": "query", "schema": { "type": "string" } },
-          { "name": "action", "in": "query", "schema": { "type": "string" } }
-        ],
-        "responses": { "200": { "description": "List of logs" } }
-      }
-    },
-    "/audit/{id}": {
-      "get": {
-        "summary": "Get audit log by ID",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
-        "responses": { "200": { "description": "Audit log" } }
-      }
-    },
-    "/webhooks/register": {
-      "post": {
-        "summary": "Register webhook (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "url": { "type": "string" },
-                  "event": { "type": "string" }
+        "responses": {
+          "200": {
+            "description": "List of webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Webhook" }
                 }
               }
             }
           }
-        },
-        "responses": { "201": { "description": "Webhook registered" } }
-      }
-    },
-    "/webhooks": {
-      "get": {
-        "summary": "List all webhooks (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "List of webhooks" } }
-      }
-    },
-    "/webhooks/{id}": {
-      "delete": {
-        "summary": "Delete webhook (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "id", "in": "path", "schema": { "type": "string" }, "required": true }],
-        "responses": { "200": { "description": "Webhook deleted" } }
-      }
-    },
-    "/oauth/register-client": {
-      "post": {
-        "summary": "Register OAuth2 client (admin)",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": { "type": "string" },
-                  "redirectUris": { "type": "array", "items": { "type": "string" } },
-                  "scopes": { "type": "array", "items": { "type": "string" } }
-                }
-              }
-            }
-          }
-        },
-        "responses": { "201": { "description": "OAuth client registered" } }
-      }
-    },
-    "/oauth/authorize": {
-      "get": {
-        "summary": "OAuth2: Authorize endpoint",
-        "parameters": [
-          { "name": "client_id", "in": "query", "schema": { "type": "string" }, "required": true },
-          { "name": "redirect_uri", "in": "query", "schema": { "type": "string" }, "required": true },
-          { "name": "scope", "in": "query", "schema": { "type": "string" }, "required": true },
-          { "name": "response_type", "in": "query", "schema": { "type": "string", "enum": ["code"] }, "required": true }
-        ],
-        "responses": { "302": { "description": "Redirect with code" } }
-      }
-    },
-    "/oauth/token": {
-      "post": {
-        "summary": "OAuth2: Token endpoint",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "code": { "type": "string" },
-                  "client_id": { "type": "string" },
-                  "client_secret": { "type": "string" },
-                  "redirect_uri": { "type": "string" },
-                  "grant_type": { "type": "string", "enum": ["authorization_code", "refresh_token"] }
-                }
-              }
-            }
-          }
-        },
-        "responses": { "200": { "description": "Access and refresh token" } }
-      }
-    },
-    "/oauth/userinfo": {
-      "get": {
-        "summary": "OAuth2 userinfo endpoint",
-        "security": [{ "bearerAuth": [] }],
-        "responses": { "200": { "description": "User info" } }
-      }
-    },
-    "/info": {
-      "get": {
-        "summary": "API info (versions, deprecation, build)",
-        "responses": { "200": { "description": "Info" } }
-      }
-    },
-    "/health": {
-      "get": {
-        "summary": "Health check",
-        "responses": { "200": { "description": "API healthy" } }
+        }
       }
     }
   }
